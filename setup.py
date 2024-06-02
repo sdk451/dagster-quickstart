@@ -1,11 +1,11 @@
 from setuptools import find_packages, setup
 
 setup(
-    name="dagster_quickstart",
-    packages=find_packages(exclude=["dagster_quickstart_tests"]),
+    name="dagster_alphasrc",
+    packages=find_packages(exclude=["dagster_alphasrc_tests"]),
     install_requires=[
         "dagster",
-        "dagster-cloud",
+        "dagster-webserver",
         "pandas",
     ],
     extras_require={"dev": ["dagster-webserver", "pytest"]},

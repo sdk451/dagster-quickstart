@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [tool.dagster]
-module_name = "dagster_quickstart"
+module_name = "dagster_alphasrc"
 
 [tool.ruff]
 
