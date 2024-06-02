@@ -1,5 +1,5 @@
 
-from dagster_alphasrc import asset 
+from dagster import asset 
 from binance.client import Client 
 import pandas as pd 
 import os
@@ -16,7 +16,7 @@ client = Client(api_key=api_key, api_secret=api_secret)
 SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'XRPUSDT'] 
 INTERVALS = [Client.KLINE_INTERVAL_1HOUR, Client.KLINE_INTERVAL_1DAY] 
 
-from dagster_alphasrc import (
+from dagster import (
     MaterializeResult,
     MetadataValue,
     asset,

@@ -1,4 +1,4 @@
-from dagster_alphasrc import Definitions, load_assets_from_modules
+from dagster import Definitions, load_assets_from_modules
 
 from . import assets, assets_binance, assets_coinmarketcap
 

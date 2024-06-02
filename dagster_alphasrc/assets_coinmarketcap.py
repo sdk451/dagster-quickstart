@@ -5,7 +5,7 @@ import requests
 import json
 import pandas as pd 
 from datetime import datetime, timedelta 
-from dagster_alphasrc import asset, op, ConfigurableResource, Config, job, OpExecutionContext, ScheduleDefinition, Definitions
+from dagster import asset
 import requests
 
 
@@ -19,7 +19,7 @@ HEADERS : dict = { 'Accepts': 'application/json', 'X-CMC_PRO_API_KEY': CMC_API_K
 # Top cryptocurrencies by market cap 
 SYMBOLS = ['BTC', 'ETH', 'XRP', 'ADA', 'DOT'] 
 
-from dagster_alphasrc import (
+from dagster import (
     MaterializeResult,
     MetadataValue,
     asset,
@@ -94,9 +94,5 @@ def cmc_rank_data(config: CMCRankingConfig) -> MaterializeResult:
         }
     )
 
-
-defs = Definitions(
-    assets=[cmc_symbol_ids, cmc_rank_data],
-)
 
 

@@ -3,7 +3,7 @@ import requests
 
 import pandas as pd
 
-from dagster_alphasrc import (
+from dagster import (
     MaterializeResult,
     MetadataValue,
     asset,

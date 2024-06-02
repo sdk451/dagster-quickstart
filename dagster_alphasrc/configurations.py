@@ -1,4 +1,4 @@
-from dagster_alphasrc import Config
+from dagster import Config
 
 class HNStoriesConfig(Config):
     top_stories_limit: int = 10
