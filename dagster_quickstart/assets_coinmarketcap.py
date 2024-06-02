@@ -78,7 +78,8 @@ def cmc_symbol_ids(config: CMCRankingConfig):
 def cmc_rank_data(config: CMCRankingConfig) -> MaterializeResult:
     """Get crypto asset market capitalisation data from coinmarketcap api endpoint"""
     rankings = fetch_cmc_rank_data()
-    df = pd.DataFrame.from_dict(rankings, orient='index', columns=["symbol", "name", "cmc_rank", "market_cap_dominance", "date_added", "last_updated"])
+    df = pd.json_normalize(rankings, sep=',') # returned json is a list of dicts separated by commas
+    # TODO: some dataframe magic to pull the quote, USD dicts from within each dict and get that level of data as well...
     if df is None:
         print("DF error!")
     else:
@@ -89,7 +90,7 @@ def cmc_rank_data(config: CMCRankingConfig) -> MaterializeResult:
             "exchange" : "coinmarketcap",
             "type"  : "market capitalisation data",
             "num_records": (0 if (df is None) else len(df)),
-            "preview": ("Failed" if df is None else MetadataValue.md(str(df[["symbol", "name", "cmc_rank", "date_added", "market_cap_dominance", "last_updated"]].to_markdown()))),
+            "preview": ("Failed" if df is None else MetadataValue.md(str(df[["symbol", "name", "cmc_rank", "date_added", "last_updated"]].to_markdown()))),
         }
     )
 
