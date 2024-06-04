@@ -1,96 +1,161 @@
 
 from dagster import asset 
-from binance.client import Client 
 import pandas as pd 
+from datetime import datetime
 import os
-import requests
-import json
-from datetime import datetime, timedelta 
 
-# Initialize Binance client 
- 
-api_key = os.environ.get('BINANCE_API_KEY') 
-api_secret = os.environ.get('BINANCE_API_SECRET') 
-client = Client(api_key=api_key, api_secret=api_secret)
-
-# Define the list of symbols and intervals 
-SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'XRPUSDT'] 
-INTERVALS = [Client.KLINE_INTERVAL_1HOUR, Client.KLINE_INTERVAL_1DAY] 
+api_key = os.environ.get('CRYPTO_DATA_DOWNLOAD_API_KEY') 
+api_secret = os.environ.get('CRYPTO_DATA_DOWNLOAD_API_SECRET') 
 
 from dagster import (
     MaterializeResult,
     MetadataValue,
     asset,
 )
-from dagster_alphasrc.configurations import BinanceKlineConfig
+from dagster_alphasrc.configurations import CryptoDataDownloadConfig
 
-# Function to fetch symbol data from Binance 
-def fetch_symbols(): 
-    url = "https://api.binance.com/api/v3/exchangeInfo"
-    try:
-        resp = requests.get(url)
-        resp.raise_for_status()
-        data = resp.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Error {e} occured in request, no symbols returned")
-        return None
+
+# https://www.cryptodatadownload.com/data/ - full table of 12,569 timeseries
+
+# exchange symbol / data list
+# https://www.cryptodatadownload.com/data/kucoin/
+# https://www.cryptodatadownload.com/data/gemini/ - daily, hourly, minute data for gemini exchange
+# https://www.cryptodatadownload.com/data/binance/
+# https://www.cryptodatadownload.com/data/poloniex/
+
+print(os.getcwd())
+datapath = os.path.normpath("\\data\\cdd")
+
+# import exchange symbols for cryptodatadownload
+def load_symbol_ids(exchange:str, filename:str):
     
-    result = data["symbols"]
-    return result
+    symbols_file = os.path.normpath(f"C:\\Users\\simon\\source\\repos\\alpha_sauce\\stack\\dagster-quickstart\\data\\cdd\\{exchange}\\{filename}")
+    # symbols_file = os.path.normpath(os.path.join(datapath, exchange, filename))
+    cdd_symbols = pd.read_csv(symbols_file, skiprows=1)
+    symbol_links = cdd_symbols[['Symbol','Url']]
+    print(f"LOADED {len(symbol_links)} {exchange} symbols")
+    return symbol_links
    
 
-# Function to fetch OHLCV data from Binance 
-def fetch_ohlcv_data(symbol, interval, start_date, end_date): 
-    klines = client.get_historical_klines(symbol, interval, start_date, end_date) 
-    df = pd.DataFrame(klines, columns=['Open Time', 'Open', 'High', 'Low', 'Close', 'Volume', 'Close Time', 'Quote Asset Volume', 'Number of Trades', 'Taker Buy Base Asset Volume', 'Taker Buy Quote Asset Volume', 'Ignore']) 
-    df['Open Time'] = pd.to_datetime(df['Open Time'], unit='ms')
-    df['Symbol'] = symbol
-    df['Interval'] = interval 
-    df[['Open', 'High', 'Low', 'Close', 'Volume']] = df[['Open', 'High', 'Low', 'Close', 'Volume']].apply(pd.to_numeric) 
-    return df[['Open Time', 'Open', 'High', 'Low', 'Close', 'Volume', 'Close Time', 'Quote Asset Volume', 'Number of Trades', 'Taker Buy Base Asset Volume', 'Taker Buy Quote Asset Volume' ]] 
+# Function to fetch OHLCV data from cryptodatadownload
+def fetch_ohlcv_data(exchange, symbol_file, symbols): 
+    # get csv data files for each symbol
+    symbols_urls = load_symbol_ids(exchange, symbol_file)
+    metadata = None
+    symbols = {}
+    if not symbols_urls.empty:
+        metadata = {}
+        date = datetime.today().strftime('%Y-%m-%d')
+        for row in symbols_urls.iloc[0:symbols].itertuples(index=False):
+            symbol = row[0]
+            url = row[1]
+            print(f"{symbol_file}: loading {symbol} from {url}...")
+            try:
+                df = pd.read_csv(url, skiprows=1)
+            except pd.errors as e:
+                print(f"An exception {e} occurred")
+                continue
+
+            filename = f"{symbol}_{date}.csv"
+            datafile = os.path.normpath(f"C:\\Users\\simon\\source\\repos\\alpha_sauce\\stack\\dagster-quickstart\\data\\cdd\\{exchange}\\{filename}")
+            # TODO: save each symbol data as individual csv file here, write out a metadata dataframe of exchange, symbol, start / end data date 
+            df.to_csv(datafile, encoding='utf-8', index=False)
+            metadata[symbol] = date
+    
+    return metadata
+
 
 @asset
-def binance_symbol_ids(config: BinanceKlineConfig):
-    """Get crypto asset symbols from Binance."""
-    symbol_ids = fetch_symbols()
-    if not symbol_ids is None:
-        with open(config.binance_symbols_path, "w") as f:
-            json.dump(symbol_ids[: config.symbols_limit], f)
+def cdd_gemini_1m(config: CryptoDataDownloadConfig):
+    """Get crypto gemini 1m data from CDD."""
+    exchange = 'gemini'
+    filename = 'CDD_Gemini_1m_symbols.csv'
+
+    metadata = fetch_ohlcv_data(exchange, filename, config.symbols_limit)
+    result = pd.DataFrame(metadata)
     
     return MaterializeResult(
         metadata={
-            "exchange" : "binance",
-            "asset_type": "spot",
-            "num_records": (0 if (symbol_ids is None) else len(symbol_ids)),
-            "preview": MetadataValue.md(str(pd.Series(symbol_ids[:20]).to_markdown())),
+            "exchange" : exchange,
+            "interval" : "1 minute",
+            "num_records": len(result),
+            "preview" : MetadataValue.md(str(result[["Symbol", "Date"]].to_markdown())),
+        }
+    )
+    
+@asset
+def cdd_gemini_1h_1d(config: CryptoDataDownloadConfig):
+    """Get crypto gemini 1h and 1D data from CDD."""
+    exchange = 'gemini'
+    filename = 'CDD_Gemini_symbols.csv'
+    
+    metadata = fetch_ohlcv_data(exchange, filename, config.symbols_limit)
+    result = pd.DataFrame(metadata)
+    
+    return MaterializeResult(
+        metadata={
+            "exchange" : exchange,
+            "interval" : "1 hour, 1 day",
+            "num_records": len(result),
+            "preview" : MetadataValue.md(str(result[["Symbol", "Date"]].to_markdown())),
+        }
+    )
+
+@asset
+def cdd_kucoin_1h_1d(config: CryptoDataDownloadConfig):
+    """Get crypto kucoin 1h and 1D data from CDD."""
+    exchange = 'kucoin'
+    filename = 'CDD_Kucoin_symbols.csv'
+    
+    metadata = fetch_ohlcv_data(exchange, filename, config.symbols_limit)
+    result = pd.DataFrame(metadata)
+    
+    return MaterializeResult(
+        metadata={
+            "exchange" : exchange,
+            "interval" : "1 hour, 1 day",
+            "num_records": len(result),
+            "preview" : MetadataValue.md(str(result[["Symbol", "Date"]].to_markdown())),
         }
     )
     
 
-
-# TODO: whats the best way to iterate through symbols and intervals to gather kline data? 
-# do it in the config and attach materialise metadata to each symbol/interval combo?
-# how to schedule a data asset materialisation run and check if we are up to date, or if we need to get new data?
-
-@asset(deps=[binance_symbol_ids])
-def binance_ohlcv_data(config: BinanceKlineConfig) -> MaterializeResult:
-    """Get crypto asset kline data based on symbols and intervals from Binance api endpoint"""
-    end_date = datetime.now() 
-    start_date = end_date - timedelta(days=365) 
-    for symbol in SYMBOLS:
-        for interval in INTERVALS:
-            # Fetch 1 year of data
-            # context.log.info(f"Fetching {interval} OHLCV data for {symbol} from {start_date} to {end_date}") 
-            df = fetch_ohlcv_data(symbol, interval, start_date.strftime("%d %b %Y %H:%M:%S"), end_date.strftime("%d %b %Y %H:%M:%S")) 
-
+@asset
+def cdd_binance_futures_um(config: CryptoDataDownloadConfig):
+    """Get crypto kucoin 1h and 1D data from CDD."""
+    exchange = 'binance'
+    filename = 'CDD_Binance_UM_futures_symbols.csv'
+    
+    metadata = fetch_ohlcv_data(exchange, filename, config.symbols_limit)
+    result = pd.DataFrame(metadata)
+    
     return MaterializeResult(
         metadata={
-            "exchange" : "binance",
-            "symbol": symbol,
-            "interval": interval,
-            "num_records": len(df),
-            "preview": MetadataValue.md(str(df[["Open Time", "Open", "High", "Low", "Close", "Volume"]].to_markdown())),
+            "exchange" : exchange,
+            "interval" : "1 hour, 1 day",
+            "num_records": len(result),
+            "preview" : MetadataValue.md(str(result[["Symbol", "Date"]].to_markdown())),
         }
     )
+
+@asset
+def cdd_polionex_1h_1d(config: CryptoDataDownloadConfig):
+    """Get crypto kucoin 1h and 1D data from CDD."""
+    
+    exchange = 'polionex'
+    filename = 'CDD_Polionex_symbols.csv'
+    
+    metadata = fetch_ohlcv_data(exchange, filename, config.symbols_limit)
+    result = pd.DataFrame(metadata)
+    
+    return MaterializeResult(
+        metadata={
+            "exchange" : exchange,
+            "interval" : "1 hour, 1 day",
+            "num_records": len(result),
+            "preview" : MetadataValue.md(str(result[["Symbol", "Date"]].to_markdown())),
+        }
+    )
+
 
     

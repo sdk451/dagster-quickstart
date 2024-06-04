@@ -5,12 +5,26 @@ class HNStoriesConfig(Config):
     hn_top_story_ids_path: str = "hackernews_top_story_ids.json"
     hn_top_stories_path: str = "hackernews_top_stories.csv"
 
-class CMCRankingConfig(Config):
-    marketcap_limit: int = 500
-    cmc_symbols_path: str = "coinmarketcap_symbols.json"
-    cmc_marketcap_path: str = "coinmarketcap_rankings.csv"
+class CoinMarketCapConfig(Config):
+    exchange : str = "coinmarketcap"
+    symbols_limit: int = 500
+    symbols_path: str = "coinmarketcap_symbols.json"
+    marketcap_path: str = "coinmarketcap_rankings.csv"
     
-class BinanceKlineConfig(Config):
+class BinanceConfig(Config):
+    exchange : str = "binance"
     symbols_limit: int = 100
-    binance_symbols_path: str = "binance_symbols.json"
-    binance_intervals_path: str = "binance_klines.csv"
+    symbols_path: str = "binance_symbols.json"
+    intervals_path: str = "binance_klines.csv"
+    
+class BybitConfig(Config):
+    exchange: str = 'bybit'
+    symbols_limit: int = 100
+    symbols_path: str = "bybit_symbols.json"
+    intervals_path: str = "bybit_klines.csv"
+    
+class CryptoDataDownloadConfig(Config):
+    exchange: str = 'cryptodatadownload'
+    symbols_limit: int = 10
+    symbols_path: str = "bybit_symbols.json"
+    intervals_path: str = "bybit_klines.csv"

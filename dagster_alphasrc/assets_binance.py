@@ -21,7 +21,7 @@ from dagster import (
     MetadataValue,
     asset,
 )
-from dagster_alphasrc.configurations import BinanceKlineConfig
+from dagster_alphasrc.configurations import BinanceConfig
 
 # Function to fetch symbol data from Binance 
 def fetch_symbols(): 
@@ -49,30 +49,28 @@ def fetch_ohlcv_data(symbol, interval, start_date, end_date):
     return df[['Open Time', 'Open', 'High', 'Low', 'Close', 'Volume', 'Close Time', 'Quote Asset Volume', 'Number of Trades', 'Taker Buy Base Asset Volume', 'Taker Buy Quote Asset Volume' ]] 
 
 @asset
-def binance_symbol_ids(config: BinanceKlineConfig):
+def binance_symbol_ids(config: BinanceConfig):
     """Get crypto asset symbols from Binance."""
     symbol_ids = fetch_symbols()
     if not symbol_ids is None:
-        with open(config.binance_symbols_path, "w") as f:
+        with open(config.symbols_path, "w") as f:
             json.dump(symbol_ids[: config.symbols_limit], f)
     
     return MaterializeResult(
         metadata={
-            "exchange" : "binance",
+            "exchange" : config.exchange,
             "asset_type": "spot",
             "num_records": (0 if (symbol_ids is None) else len(symbol_ids)),
             "preview": MetadataValue.md(str(pd.Series(symbol_ids[:20]).to_markdown())),
         }
     )
-    
-
 
 # TODO: whats the best way to iterate through symbols and intervals to gather kline data? 
 # do it in the config and attach materialise metadata to each symbol/interval combo?
 # how to schedule a data asset materialisation run and check if we are up to date, or if we need to get new data?
 
 @asset(deps=[binance_symbol_ids])
-def binance_ohlcv_data(config: BinanceKlineConfig) -> MaterializeResult:
+def binance_ohlcv_data(config: BinanceConfig) -> MaterializeResult:
     """Get crypto asset kline data based on symbols and intervals from Binance api endpoint"""
     end_date = datetime.now() 
     start_date = end_date - timedelta(days=365) 
@@ -84,10 +82,10 @@ def binance_ohlcv_data(config: BinanceKlineConfig) -> MaterializeResult:
 
     return MaterializeResult(
         metadata={
-            "exchange" : "binance",
-            "symbol": symbol,
-            "interval": interval,
-            "num_records": len(df),
+            "exchange" : config.exchange,
+            "symbol" : symbol,
+            "interval" : interval,
+            "num_records" : len(df),
             "preview": MetadataValue.md(str(df[["Open Time", "Open", "High", "Low", "Close", "Volume"]].to_markdown())),
         }
     )

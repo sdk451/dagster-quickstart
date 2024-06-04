@@ -1,10 +1,8 @@
-#Python code that uses Dagster to define and download OHLCV (Open, High, Low, Close, Volume) data from CoinMarketCap on a daily schedule. 
-# First, make sure you have Dagster and the CoinMarketCap API package installed: ```bash pip install dagster dagster-core dagster-cron requests pandas ``` Now, here's the Python code: ```python 
-import os 
+#Python code that uses Dagster to define and download OHLCV (Open, High, Low, Close, Volume) data from CoinMarketCap on a daily schedule.  
 import requests 
 import json
 import pandas as pd 
-from datetime import datetime, timedelta 
+# from datetime import datetime, timedelta 
 from dagster import asset
 import requests
 
@@ -25,7 +23,7 @@ from dagster import (
     asset,
 )
 
-from dagster_alphasrc.configurations import CMCRankingConfig
+from dagster_alphasrc.configurations import CoinMarketCapConfig
 
 # Function to get cryptocurrency IDs from CoinMarketCap 
 def fetch_cmc_crypto_map(): 
@@ -55,19 +53,19 @@ def fetch_cmc_rank_data():
 
 
 @asset(deps=[])
-def cmc_symbol_ids(config: CMCRankingConfig):
+def cmc_symbol_ids(config: CoinMarketCapConfig):
     """Get crypto asset symbols from Coinmarketcap"""
     symbol_ids = fetch_cmc_crypto_map()
     if symbol_ids is None:
         print("error!")
         
     else:
-        with open(config.cmc_symbols_path, "w") as f:
-            json.dump(symbol_ids[: config.marketcap_limit], f)
+        with open(config.symbols_path, "w") as f:
+            json.dump(symbol_ids[: config.symbols_limit], f)
             
     return MaterializeResult(
         metadata={
-            "exchange" : "coinmarketcap",
+            "exchange" : config.exchange,
             "type"  : "crypto symbols",
             "num_records": (0 if (symbol_ids is None) else len(symbol_ids)),
             "preview": ("Download Failed" if symbol_ids is None else MetadataValue.md(str(pd.Series(symbol_ids[:20]).to_markdown()))),
@@ -75,7 +73,7 @@ def cmc_symbol_ids(config: CMCRankingConfig):
     )
 
 @asset(deps=[])
-def cmc_rank_data(config: CMCRankingConfig) -> MaterializeResult:
+def cmc_rank_data(config: CoinMarketCapConfig) -> MaterializeResult:
     """Get crypto asset market capitalisation data from coinmarketcap api endpoint"""
     rankings = fetch_cmc_rank_data()
     df = pd.json_normalize(rankings, sep=',') # returned json is a list of dicts separated by commas
@@ -83,7 +81,7 @@ def cmc_rank_data(config: CMCRankingConfig) -> MaterializeResult:
     if df is None:
         print("DF error!")
     else:
-        df.to_csv(config.cmc_marketcap_path, index=False)
+        df.to_csv(config.marketcap_path, index=False)
 
     return MaterializeResult(
         metadata={
